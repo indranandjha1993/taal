@@ -10,7 +10,9 @@ let joined = false;
 const awake = new Awake(showAwake);
 
 function connect() {
-  ws = new WebSocket(`ws://${location.host}/ws`);
+  // a secure page cannot open an insecure socket
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
   ws.binaryType = 'arraybuffer';
 
   clock = new Clock(ws);

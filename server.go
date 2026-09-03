@@ -73,7 +73,13 @@ func (s *server) handleSources(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) handleQR(w http.ResponseWriter, r *http.Request) {
-	url := fmt.Sprintf("http://%s/", qrTarget(r.Host))
+	// a qr pointing at http would land phones on a page that cannot hold
+	// the screen on, so follow whatever this request came in on
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	url := fmt.Sprintf("%s://%s/", scheme, qrTarget(r.Host))
 	png, err := qrcode.Encode(url, qrcode.Medium, 320)
 	if err != nil {
 		http.Error(w, "qr failed", http.StatusInternalServerError)

@@ -13,6 +13,7 @@ import (
 func main() {
 	// 8225 is "taal" typed on a phone keypad
 	port := flag.Int("port", 8225, "port to listen on")
+	plain := flag.Bool("http", false, "serve plain http, which disables the screen wake lock")
 	flag.Parse()
 
 	cap, err := newCapture()
@@ -30,10 +31,15 @@ func main() {
 		addr = lanIP()
 	}
 
+	scheme := "https"
+	if *plain {
+		scheme = "http"
+	}
+
 	fmt.Println()
 	fmt.Println("  taal is up")
-	fmt.Printf("  host controls   http://%s:%d/host\n", addr, *port)
-	fmt.Printf("  speakers join   http://%s:%d/\n", addr, *port)
+	fmt.Printf("  host controls   %s://%s:%d/host\n", scheme, addr, *port)
+	fmt.Printf("  speakers join   %s://%s:%d/\n", scheme, addr, *port)
 	printSources(cap)
 	if os.Getenv("TAAL_HOST") == "" && inContainer() {
 		fmt.Println()
@@ -42,7 +48,21 @@ func main() {
 	}
 	fmt.Println()
 
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), s.routes()))
+	listen := fmt.Sprintf(":%d", *port)
+	if *plain {
+		fmt.Println("  plain http: phones cannot hold the screen on.")
+		fmt.Println()
+		log.Fatal(http.ListenAndServe(listen, s.routes()))
+	}
+
+	certFile, keyFile, err := ensureCert(addr)
+	if err != nil {
+		log.Fatal("certificate: ", err)
+	}
+	fmt.Println("  self signed cert, so each phone warns once on first visit.")
+	fmt.Println("  accept it and the screen wake lock starts working.")
+	fmt.Println()
+	log.Fatal(http.ListenAndServeTLS(listen, certFile, keyFile, s.routes()))
 }
 
 // a mic would capture the room, so say plainly whether a loopback device

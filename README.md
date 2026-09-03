@@ -34,6 +34,13 @@ of step with the rest of the room.
 go run .
 ```
 
+It serves https with a self signed certificate it generates on first run and
+keeps in your config directory. That is not decoration: the screen wake lock
+and the media session only exist in a secure context, and a plain lan address
+is not one, so over http a phone cannot keep itself awake. The tradeoff is
+that each phone shows a certificate warning the first time, which you accept
+once. Pass `-http` to serve plain http instead and give that up.
+
 It prints two URLs. Opening the root address gives a choice of hosting the
 room or joining as a speaker. The host page carries the QR code that everyone
 else scans, the capture source picker, and the mixer.
@@ -122,6 +129,7 @@ a Chromecast receiver since that is an HTML page too.
 
 ```
 main.go          startup, LAN address detection
+tls.go           self signed certificate, generated once and reused
 capture.go       coreaudio capture, device listing
 stream.go        binary chunk framing
 server.go        routes, source listing, QR

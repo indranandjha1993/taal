@@ -6,7 +6,9 @@ let dragging = null;
 el('url').textContent = location.host;
 
 function connect() {
-  ws = new WebSocket(`ws://${location.host}/ws`);
+  // a secure page cannot open an insecure socket
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
 
   ws.onopen = () => ws.send(JSON.stringify({ type: 'hello', role: 'host' }));
   ws.onclose = () => setTimeout(connect, 2000);
