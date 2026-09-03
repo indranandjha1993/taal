@@ -59,10 +59,19 @@ func main() {
 	if err != nil {
 		log.Fatal("certificate: ", err)
 	}
+
 	fmt.Println("  self signed cert, so each phone warns once on first visit.")
 	fmt.Println("  accept it and the screen wake lock starts working.")
 	fmt.Println()
-	log.Fatal(http.ListenAndServeTLS(listen, certFile, keyFile, s.routes()))
+
+	srv := &http.Server{
+		Addr:    listen,
+		Handler: s.routes(),
+		// go answers a plain http request to a tls port with a bare line of
+		// text, which reads as a broken page. send a redirect instead.
+		ErrorLog: log.New(tlsNoise{}, "", 0),
+	}
+	log.Fatal(serveTLSWithRedirect(srv, certFile, keyFile, *port))
 }
 
 // a mic would capture the room, so say plainly whether a loopback device
