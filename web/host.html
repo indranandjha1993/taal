@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>taal host</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap wide">
+  <h1>taal <small>host</small></h1>
+
+  <img id="qr" src="/qr.png" alt="join code" class="qr">
+  <p class="sub">scan to join, or open <b id="url"></b></p>
+
+  <label class="field">
+    <span>capture from</span>
+    <select id="source"></select>
+    <small id="hint"></small>
+  </label>
+
+  <div class="row">
+    <button id="start" class="big">start streaming</button>
+    <button id="stop" class="big ghost" disabled>stop</button>
+  </div>
+
+  <label class="nudge">
+    <span>buffer <b id="delayVal">400 ms</b></span>
+    <input type="range" id="delay" min="100" max="1000" value="400" step="50">
+    <small>how far behind the mac the speakers play. lower is tighter,
+    too low and phones start dropping audio.</small>
+  </label>
+
+  <section class="mixer">
+    <h2>mixer <span class="muted" id="count">0 speakers</span></h2>
+    <div id="speakers" class="speakers">
+      <p class="empty">nobody has joined yet</p>
+    </div>
+  </section>
+</main>
+<script type="module" src="host.js"></script>
+</body>
+</html>
