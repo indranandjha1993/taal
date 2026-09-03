@@ -1,4 +1,5 @@
 import { Clock, LivePlayer } from './sync.js';
+import { Awake, claimMediaSession } from './awake.js';
 
 const el = (id) => document.getElementById(id);
 const NUDGE_KEY = 'taal.nudge';
@@ -6,6 +7,7 @@ const NAME_KEY = 'taal.name';
 
 let ws, clock, player;
 let joined = false;
+const awake = new Awake(showAwake);
 
 function connect() {
   ws = new WebSocket(`ws://${location.host}/ws`);
@@ -67,6 +69,9 @@ function handle(msg) {
 }
 
 function onTick({ leadMs, late }) {
+  if (player.ctx) {
+    el('rate').textContent = `${(player.ctx.sampleRate / 1000).toFixed(1)}k`;
+  }
   const d = el('lead');
   d.textContent = `${leadMs.toFixed(0)} ms`;
   // a shrinking lead means this device is falling behind the stream and
@@ -79,12 +84,17 @@ function setState(text) {
   el('state').textContent = text;
 }
 
-// screen lock suspends the tab and audio dies with it
-async function keepAwake() {
-  try {
-    await navigator.wakeLock.request('screen');
-  } catch (e) {
-    // not supported or denied, nothing to do about it
+function showAwake(state) {
+  const el2 = el('awake');
+  if (state === 'held') {
+    el2.textContent = 'screen will stay on';
+    el2.className = 'awake ok';
+  } else if (state === 'unsupported') {
+    el2.textContent = 'this browser cannot hold the screen on. keep it awake yourself.';
+    el2.className = 'awake warn';
+  } else {
+    el2.textContent = 'screen lock will stop the audio. keep this page open.';
+    el2.className = 'awake warn';
   }
 }
 
@@ -95,7 +105,8 @@ el('join').addEventListener('click', async () => {
     ws.send(JSON.stringify({ type: 'hello', role: 'guest', name }));
   }
   await player.unlock();
-  await keepAwake();
+  await awake.acquire();
+  claimMediaSession(name);
   joined = true;
   el('setup').hidden = true;
   el('panel').hidden = false;
@@ -113,10 +124,6 @@ el('vol').addEventListener('input', (e) => {
   const pct = Number(e.target.value);
   el('volVal').textContent = `${pct}%`;
   player.setVolume(pct / 100);
-});
-
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && joined) keepAwake();
 });
 
 const savedNudge = Number(localStorage.getItem(NUDGE_KEY) || 0);

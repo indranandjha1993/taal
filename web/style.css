@@ -216,3 +216,12 @@ input[type="range"] {
 }
 
 .empty { color: var(--dim); font-size: 13px; margin: 6px 0; }
+
+.awake {
+  margin: 0 0 20px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.awake.ok { color: var(--dim); }
+.awake.warn { color: var(--accent); }

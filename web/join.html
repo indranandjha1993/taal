@@ -21,6 +21,7 @@
 
   <div id="panel" hidden>
     <div class="state" id="state">connected</div>
+    <p class="awake" id="awake"></p>
 
     <label class="nudge">
       <span>nudge <b id="nudgeVal">0 ms</b></span>
@@ -39,10 +40,12 @@
       <div><dt>rtt</dt><dd id="rtt">-</dd></div>
       <div><dt>lead</dt><dd id="lead">-</dd></div>
       <div><dt>dropped</dt><dd id="late">0</dd></div>
+      <div><dt>rate</dt><dd id="rate">-</dd></div>
     </dl>
   </div>
 
-  <p class="tip">keep this screen on. bluetooth speakers will not stay in sync.</p>
+  <p class="tip">bluetooth speakers will not stay in sync. on iphone the audio
+  stops if you lock the screen or switch apps, which no web page can prevent.</p>
 </main>
 <script type="module" src="app.js"></script>
 </body>
