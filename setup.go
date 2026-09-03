@@ -1,9 +1,6 @@
 package main
 
-import (
-	"os/exec"
-	"strings"
-)
+import "os/exec"
 
 // Everything needed to go from "a mac with music playing" to "a mac whose
 // audio taal can hear", without the person running it knowing what a
@@ -76,21 +73,19 @@ func hasBrew() bool {
 	return err == nil
 }
 
-// Installing a system audio driver needs an admin password, so this cannot
-// be silent. It returns the command for the page to show rather than
-// running it blind.
 func installCommand() string {
-	return "brew install blackhole-2ch"
+	return "brew install --cask blackhole-2ch"
 }
 
+// BlackHole is a system audio driver, so installing it needs an admin
+// password. A browser request has no terminal to type one into, which means
+// this can only ever hand the command over. Pretending otherwise would hang
+// on a password prompt nobody can see.
 func runInstall() (string, bool) {
 	if !hasBrew() {
-		return "homebrew is not installed", false
+		return "homebrew is not installed. install it from brew.sh first, " +
+			"or get BlackHole from existential.audio/blackhole", false
 	}
-	out, err := exec.Command("brew", "install", "blackhole-2ch").CombinedOutput()
-	text := strings.TrimSpace(string(out))
-	if err != nil {
-		return text, false
-	}
-	return text, true
+	return "installing an audio driver needs an admin password, which a web " +
+		"page cannot ask for. run this in a terminal:", false
 }

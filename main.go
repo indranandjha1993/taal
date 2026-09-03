@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 func main() {
@@ -25,8 +26,9 @@ func main() {
 	s := newServer(cap)
 	cleanupOnSignal(s)
 
-	// a previous run may have died holding the audio output
-	if note := recoverFromCrash(); note != "" {
+	// a previous run may have died holding the audio output. another taal
+	// that is alive and streaming is not wreckage, so leave that alone.
+	if note := recoverFromCrash(anotherTaalIsStreaming(*port)); note != "" {
 		fmt.Println()
 		fmt.Println("  " + note)
 	}
@@ -45,8 +47,8 @@ func main() {
 
 	fmt.Println()
 	fmt.Println("  taal is up")
-	fmt.Printf("  host controls   %s://%s:%d/host\n", scheme, addr, *port)
-	fmt.Printf("  speakers join   %s://%s:%d/\n", scheme, addr, *port)
+	fmt.Printf("  open  %s://%s:%d\n", scheme, addr, *port)
+	fmt.Println("  controls on this mac, speaker on every other device")
 	printSources(cap)
 	if os.Getenv("TAAL_HOST") == "" && inContainer() {
 		fmt.Println()
@@ -110,6 +112,24 @@ func printSources(c *capture) {
 		return
 	}
 	fmt.Println("  capture ready:", strings.Join(loop, ", "))
+}
+
+// A second copy started on another port must not steal the audio device
+// from the first. Anything already answering on the taal port is treated as
+// a live instance.
+func anotherTaalIsStreaming(port int) bool {
+	if currentOutputName() != routingName {
+		return false
+	}
+	for _, p := range []int{8225, port} {
+		c, err := net.DialTimeout("tcp",
+			fmt.Sprintf("127.0.0.1:%d", p), 300*time.Millisecond)
+		if err == nil {
+			c.Close()
+			return true
+		}
+	}
+	return false
 }
 
 func isLocal(host string) bool {

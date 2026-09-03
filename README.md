@@ -28,6 +28,25 @@ minus its own output latency. A chunk that arrives past its due time is
 dropped rather than played late, since playing it would put that speaker out
 of step with the rest of the room.
 
+## First run on a new mac
+
+```
+brew install --cask blackhole-2ch
+make start
+```
+
+BlackHole is a small audio driver. macos gives no app direct access to what
+the speakers are playing, so without it nothing can capture your audio, taal
+included. It is open source, it is the same driver most screen recorders use,
+and installing it asks for your admin password because it is a system driver.
+
+Skipping this step is fine: taal starts anyway and the page explains what is
+missing rather than showing controls that cannot work. Install the driver,
+press check again, and it carries on.
+
+You will also meet a certificate warning the first time each device opens
+taal. That is expected, see the https section below.
+
 ## Running it
 
 ```

@@ -58,14 +58,9 @@ async function checkSetup() {
   if (s.ready) return;
 
   el('setupMsg').textContent = s.detail;
-  if (s.installer === 'brew') {
-    el('install').hidden = false;
-    el('setupCmd').hidden = true;
-  } else {
-    el('install').hidden = true;
-    el('setupCmd').hidden = false;
-    el('setupCmd').textContent = s.command;
-  }
+  el('install').hidden = false;
+  el('setupCmd').hidden = true;
+  el('setupCmd').textContent = s.command;
 }
 
 function showError(text) {
@@ -141,20 +136,13 @@ el('power').addEventListener('click', () => {
 });
 
 el('install').addEventListener('click', async () => {
-  el('install').disabled = true;
-  el('install').textContent = 'installing, this takes a minute';
   const res = await fetch('/setup', { method: 'POST' });
   const out = await res.json();
-  el('install').disabled = false;
-  el('install').textContent = 'set up audio for me';
-  if (out.ok) {
-    el('setupMsg').textContent = 'installed, checking again';
-    setTimeout(checkSetup, 1500);
-  } else {
-    el('setupMsg').textContent = out.detail || 'that did not work';
-    el('setupCmd').hidden = false;
-    el('setupCmd').textContent = out.command;
-  }
+  el('setupMsg').textContent = out.detail;
+  el('setupCmd').hidden = false;
+  el('setupCmd').textContent = out.command;
+  el('install').textContent = 'check again';
+  el('install').onclick = checkSetup;
 });
 
 el('audible').addEventListener('change', (e) => {

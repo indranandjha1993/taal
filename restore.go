@@ -47,7 +47,13 @@ func forgetOutput() {
 
 // Called at startup, before anything else touches the audio system. Puts the
 // output back if we died holding it, and clears any device we left behind.
-func recoverFromCrash() string {
+//
+// Skipped when another taal is already streaming: the routing device it is
+// using is not wreckage, and taking it away would silence a working room.
+func recoverFromCrash(busy bool) string {
+	if busy {
+		return ""
+	}
 	var note string
 
 	p := restorePath()
