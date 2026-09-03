@@ -31,8 +31,17 @@ of step with the rest of the room.
 ## Running it
 
 ```
-go run .
+make          what the other commands are
+make run      run it here, ctrl-c to stop
+make start    run it in the background
+make status   is it up, and on which address
+make logs     follow the log
+make stop     stop it and put the audio back
 ```
+
+`make start` prints the two addresses and keeps the server alive after you
+close the terminal. Starting twice does not launch a second one, and a start
+on an occupied port fails loudly rather than pretending it worked.
 
 It serves https with a self signed certificate it generates on first run and
 keeps in your config directory. That is not decoration: the screen wake lock
@@ -69,7 +78,7 @@ in the mixer, so a row can be turned down or muted without guessing whose
 phone it is.
 
 ```
-go run . -port 9000
+PORT=9000 make start
 ```
 
 Works on home Wi-Fi or a phone hotspot. Nothing leaves the local network and

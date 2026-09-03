@@ -4,3 +4,5 @@ dist/
 *.wav
 *.m4a
 __pycache__/
+.taal-*.pid
+taal-*.log
