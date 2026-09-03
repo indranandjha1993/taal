@@ -25,6 +25,12 @@ const (
 	pingEvery   = 5 * time.Second
 	pongTimeout = 12 * time.Second
 	writeWait   = 10 * time.Second
+
+	// a name is shown on every screen and an id is a map key, so neither is
+	// allowed to be whatever a client feels like sending
+	maxNameLen = 24
+	maxIDLen   = 64
+	maxMsgLen  = 4096
 )
 
 type client struct {
@@ -119,6 +125,7 @@ func (s *server) readPump(c *client) {
 	defer s.drop(c)
 
 	// every pong, and every message, proves the far end is still there
+	c.conn.SetReadLimit(maxMsgLen)
 	c.conn.SetReadDeadline(time.Now().Add(pongTimeout))
 	c.conn.SetPongHandler(func(string) error {
 		return c.conn.SetReadDeadline(time.Now().Add(pongTimeout))
@@ -141,6 +148,8 @@ func (s *server) readPump(c *client) {
 		case "hello":
 			name, _ := msg["name"].(string)
 			id, _ := msg["id"].(string)
+			name = clip(name, maxNameLen)
+			id = clip(id, maxIDLen)
 			s.hello(c, msg["role"] == "guest", name, id)
 		case "start":
 			audible, ok := msg["audible"].(bool)
@@ -194,6 +203,14 @@ func (c *client) trySendBinary(pcm []byte) {
 	case c.audio <- pcm:
 	default:
 	}
+}
+
+func clip(s string, n int) string {
+	r := []rune(s)
+	if len(r) > n {
+		return string(r[:n])
+	}
+	return s
 }
 
 func marshal(v any) []byte {
