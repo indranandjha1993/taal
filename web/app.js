@@ -91,6 +91,10 @@ function showAwake(state) {
   if (state === 'held') {
     el2.textContent = 'screen will stay on';
     el2.className = 'awake ok';
+  } else if (state === 'insecure') {
+    el2.textContent = 'opened over plain http, so the screen lock cannot be held. '
+      + 'use the https address.';
+    el2.className = 'awake warn';
   } else if (state === 'unsupported') {
     el2.textContent = 'this browser cannot hold the screen on. keep it awake yourself.';
     el2.className = 'awake warn';

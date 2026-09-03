@@ -32,6 +32,14 @@ export class Awake {
     return 'wakeLock' in navigator;
   }
 
+  // the api is missing for two very different reasons and the fix differs,
+  // so tell them apart: an insecure page can be fixed by using https, an
+  // old browser cannot be fixed at all
+  get reason() {
+    if (this.supported) return '';
+    return window.isSecureContext ? 'browser' : 'insecure';
+  }
+
   async acquire() {
     this.want = true;
     if (!this.supported || this.lock) {
@@ -69,7 +77,7 @@ export class Awake {
   }
 
   status() {
-    if (!this.supported) return 'unsupported';
+    if (!this.supported) return this.reason === 'insecure' ? 'insecure' : 'unsupported';
     return this.lock ? 'held' : 'lost';
   }
 }

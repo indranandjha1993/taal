@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 // Typing "192.168.1.5:8225" into a phone gets you http, and go answers a
@@ -28,26 +29,53 @@ type splitListener struct {
 	net.Listener
 	tlsConf *tls.Config
 	port    int
+	ready   chan net.Conn
+	failed  chan error
 }
 
-func (l splitListener) Accept() (net.Conn, error) {
-	c, err := l.Listener.Accept()
-	if err != nil {
-		return nil, err
+// Peeking blocks until the client sends its first byte, so it must never
+// happen on the accept loop: one silent connection would stall every other
+// device. Each connection is classified on its own goroutine and the tls
+// ones are handed back through a channel.
+func (l *splitListener) Accept() (net.Conn, error) {
+	for {
+		select {
+		case c := <-l.ready:
+			return c, nil
+		case err := <-l.failed:
+			return nil, err
+		}
 	}
+}
+
+func (l *splitListener) loop() {
+	for {
+		c, err := l.Listener.Accept()
+		if err != nil {
+			l.failed <- err
+			return
+		}
+		go l.classify(c)
+	}
+}
+
+func (l *splitListener) classify(c net.Conn) {
+	// a client that connects and says nothing must not hold a slot forever
+	c.SetReadDeadline(time.Now().Add(10 * time.Second))
 	r := bufio.NewReader(c)
 	first, err := r.Peek(1)
 	if err != nil {
 		c.Close()
-		// a closed probe is not a listener failure, keep serving
-		return l.Accept()
+		return
 	}
+	c.SetReadDeadline(time.Time{})
+
 	wrapped := peekConn{Conn: c, r: r}
 	if first[0] == 0x16 {
-		return tls.Server(wrapped, l.tlsConf), nil
+		l.ready <- tls.Server(wrapped, l.tlsConf)
+		return
 	}
-	go redirect(wrapped, l.port)
-	return l.Accept()
+	redirect(wrapped, l.port)
 }
 
 func redirect(c net.Conn, port int) {
@@ -85,7 +113,15 @@ func serveTLSWithRedirect(srv *http.Server, certFile, keyFile string, port int) 
 	if err != nil {
 		return err
 	}
-	return srv.Serve(splitListener{Listener: ln, tlsConf: conf, port: port})
+	sl := &splitListener{
+		Listener: ln,
+		tlsConf:  conf,
+		port:     port,
+		ready:    make(chan net.Conn),
+		failed:   make(chan error, 1),
+	}
+	go sl.loop()
+	return srv.Serve(sl)
 }
 
 // plain http on the tls port is handled by the redirect above, so the
