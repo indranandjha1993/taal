@@ -1,0 +1,6 @@
+/taal
+dist/
+*.mp3
+*.wav
+*.m4a
+__pycache__/
