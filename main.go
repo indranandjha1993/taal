@@ -78,6 +78,14 @@ func main() {
 		// text, which reads as a broken page. send a redirect instead.
 		ErrorLog: log.New(tlsNoise{}, "", 0),
 	}
+	// streaming from the moment the server is up: the person who ran this
+	// wants their audio shared, not a button to press first
+	go func() {
+		if setup := inspectAudio(cap); setup.Ready {
+			s.startStream(true)
+		}
+	}()
+
 	log.Fatal(serveTLSWithRedirect(srv, certFile, keyFile, *port))
 }
 

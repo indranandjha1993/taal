@@ -65,8 +65,8 @@ restart:
 status:
 	@if [ -f $(PID) ] && kill -0 $$(cat $(PID)) 2>/dev/null; then \
 		echo "running   pid $$(cat $(PID))"; \
-		echo "host      https://$$($(MAKE) --no-print-directory ip):$(PORT)/host"; \
-		echo "speakers  https://$$($(MAKE) --no-print-directory ip):$(PORT)/"; \
+		echo "open      https://$$($(MAKE) --no-print-directory ip):$(PORT)/"; \
+		echo "          controls on this mac, speaker on every other device"; \
 	else \
 		echo "not running   (make start)"; \
 	fi

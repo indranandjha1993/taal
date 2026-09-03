@@ -299,3 +299,45 @@ select {
 .check input { accent-color: var(--accent); }
 
 .tip.warn { color: var(--accent); }
+
+.live {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 0 24px;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.dot.on { background: var(--accent); }
+.dot.off { background: var(--line); }
+
+.more {
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+}
+
+.more summary {
+  cursor: pointer;
+  color: var(--dim);
+  font-size: 13px;
+  list-style: none;
+}
+
+.more summary::-webkit-details-marker { display: none; }
+.more summary::before { content: "+ "; }
+.more[open] summary::before { content: "- "; }
+
+.more .check { justify-content: flex-start; margin-top: 16px; }
+
+.sub.warn { color: var(--accent); }

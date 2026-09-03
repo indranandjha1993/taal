@@ -36,21 +36,19 @@ function connect() {
 function setConn(text, ok) {
   const c = el('conn');
   c.textContent = text;
-  c.className = ok ? 'conn ok' : 'conn warn';
+  c.className = ok ? 'sub' : 'sub warn';
 }
 
 function applyState(msg) {
   streaming = msg.streaming;
+  el('dot').className = streaming ? 'dot on' : 'dot off';
+  el('liveText').textContent = streaming
+    ? 'live, anything this mac plays goes to the speakers below'
+    : 'stopped, nothing is being sent';
   el('power').textContent = streaming ? 'stop streaming' : 'start streaming';
-  el('power').className = streaming ? 'big ghost' : 'big';
   el('audible').checked = msg.audible;
-  el('audible').disabled = streaming;
   el('delay').value = msg.delayMs;
   el('delayVal').textContent = `${msg.delayMs} ms`;
-  el('playing').className = 'tip';
-  el('playing').textContent = streaming
-    ? 'streaming. anything this mac plays comes out of the phones below.'
-    : 'play anything on this mac and it comes out of every phone that joins.';
 }
 
 async function checkSetup() {
@@ -71,8 +69,8 @@ async function checkSetup() {
 }
 
 function showError(text) {
-  el('playing').textContent = text;
-  el('playing').className = 'tip warn';
+  el('liveText').textContent = text;
+  el('dot').className = 'dot off';
 }
 
 function renderSpeakers(speakers) {
@@ -138,7 +136,6 @@ el('power').addEventListener('click', () => {
   if (streaming) {
     ws.send(JSON.stringify({ type: 'stop' }));
   } else {
-    el('playing').className = 'tip';
     ws.send(JSON.stringify({ type: 'start', audible: el('audible').checked }));
   }
 });
@@ -158,6 +155,16 @@ el('install').addEventListener('click', async () => {
     el('setupCmd').hidden = false;
     el('setupCmd').textContent = out.command;
   }
+});
+
+el('audible').addEventListener('change', (e) => {
+  if (!streaming) return;
+  // it only takes effect when the routing is rebuilt, so do that now
+  // rather than leaving a setting that silently does nothing
+  ws.send(JSON.stringify({ type: 'stop' }));
+  setTimeout(() => {
+    ws.send(JSON.stringify({ type: 'start', audible: e.target.checked }));
+  }, 400);
 });
 
 el('delay').addEventListener('input', (e) => {

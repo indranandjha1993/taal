@@ -3,14 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>taal host</title>
+<title>taal</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main class="wrap wide">
-  <h1>taal <small>host</small></h1>
-
-  <div id="conn" class="conn">connecting</div>
+  <h1>taal</h1>
+  <p class="sub" id="conn">connecting</p>
 
   <section id="setup" class="setup" hidden>
     <p class="setup-msg" id="setupMsg"></p>
@@ -19,25 +18,15 @@
   </section>
 
   <section id="ready" hidden>
+    <div class="live">
+      <span class="dot" id="dot"></span>
+      <span id="liveText">live</span>
+    </div>
+
+    <button id="power" class="big ghost">stop streaming</button>
+
     <img id="qr" src="/qr.png" alt="join code" class="qr">
-    <p class="sub">scan to join, or open <b id="url"></b></p>
-
-    <button id="power" class="big">start streaming</button>
-
-    <label class="check">
-      <input type="checkbox" id="audible" checked>
-      <span>keep playing on this mac too</span>
-    </label>
-
-    <p class="tip" id="playing">play anything on this mac and it comes out of
-    every phone that joins.</p>
-
-    <label class="nudge">
-      <span>delay <b id="delayVal">400 ms</b></span>
-      <input type="range" id="delay" min="100" max="1000" value="400" step="50">
-      <small>how far behind the mac the phones play. lower is tighter, too low
-      and they start dropping audio.</small>
-    </label>
+    <p class="sub">scan to add a speaker, or open <b id="url"></b></p>
 
     <section class="mixer">
       <h2>speakers <span class="muted" id="count">none yet</span></h2>
@@ -45,6 +34,23 @@
         <p class="empty">scan the code on a phone to add one</p>
       </div>
     </section>
+
+    <details class="more">
+      <summary>settings</summary>
+
+      <label class="check">
+        <input type="checkbox" id="audible" checked>
+        <span>keep playing on this mac too</span>
+      </label>
+
+      <label class="nudge">
+        <span>delay <b id="delayVal">400 ms</b></span>
+        <input type="range" id="delay" min="100" max="1000" value="400" step="50">
+        <small>how far behind the mac the phones play. lower is tighter, too
+        low and they start dropping audio.</small>
+      </label>
+
+    </details>
   </section>
 </main>
 <script type="module" src="host.js"></script>

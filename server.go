@@ -22,20 +22,27 @@ func (s *server) routes() http.Handler {
 		panic(err)
 	}
 
-	mux.Handle("/", http.FileServer(http.FS(sub)))
-	page := func(name string) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			b, err := fs.ReadFile(sub, name)
-			if err != nil {
-				http.Error(w, "missing "+name, http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.Write(b)
+	// One address for everyone. The mac running taal gets the controls,
+	// every other device gets the speaker page. Nothing to type, nothing to
+	// pick, and a phone cannot reach the controls at all.
+	files := http.FileServer(http.FS(sub))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			files.ServeHTTP(w, r)
+			return
 		}
-	}
-	mux.HandleFunc("/host", page("host.html"))
-	mux.HandleFunc("/join", page("join.html"))
+		name := "join.html"
+		if isLoopbackAddr(r.RemoteAddr) {
+			name = "host.html"
+		}
+		b, err := fs.ReadFile(sub, name)
+		if err != nil {
+			http.Error(w, "missing "+name, http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(b)
+	})
 	mux.HandleFunc("/ws", s.handleWS)
 	mux.HandleFunc("/setup", s.handleSetup)
 	mux.HandleFunc("/whoami", s.handleWhoami)
