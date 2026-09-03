@@ -10,6 +10,9 @@ const SYNC_BURST = 8;        // pings per round, keep the least delayed one
 const RESYNC_MS = 15000;
 const MAGIC = 0x4c414154;    // "TAAL"
 const HEADER = 20;           // magic + startAt + seq
+// how far the anchored timeline may drift from the clock before it is
+// worth the audible reseat. well above clock jitter, well below the buffer.
+const RESEAT_S = 0.05;
 
 export class Clock {
   constructor(ws) {
@@ -79,6 +82,8 @@ export class LivePlayer {
     this.late = 0;           // chunks that arrived past their play time
     this.played = 0;
     this.lastLeadMs = 0;
+    this.anchor = null;      // audio clock time of anchorSeq
+    this.anchorSeq = 0;
   }
 
   // must be called from a user gesture, browsers refuse audio otherwise
@@ -196,8 +201,30 @@ export class LivePlayer {
     const view = new DataView(buf);
     if (view.getUint32(0, true) !== MAGIC) return;
     const startAt = view.getFloat64(4, true);
+    const seq = Number(view.getBigInt64(12, true));
 
-    const when = this.hostToAudio(startAt);
+    // Placing every chunk from a fresh clock reading sounds wrong: the
+    // estimate jitters by a fraction of a millisecond, so consecutive
+    // buffers overlap or leave a hole and the seam clicks 50 times a
+    // second. Anchor once, then place each chunk by its sample index so
+    // neighbours butt together exactly, and only re-anchor if we have
+    // genuinely lost the thread.
+    let when;
+    if (this.anchor === null || seq < this.anchorSeq) {
+      when = this.hostToAudio(startAt);
+      this.anchor = when;
+      this.anchorSeq = seq;
+    } else {
+      when = this.anchor + (seq - this.anchorSeq) / this.rate;
+      const ideal = this.hostToAudio(startAt);
+      // a real drift, not jitter, means the anchor is stale
+      if (Math.abs(ideal - when) > RESEAT_S) {
+        when = ideal;
+        this.anchor = when;
+        this.anchorSeq = seq;
+      }
+    }
+
     const leadMs = (when - this.ctx.currentTime) * 1000;
     this.lastLeadMs = leadMs;
 
@@ -205,6 +232,7 @@ export class LivePlayer {
     // other speaker, and a partial chunk clicks, so drop it.
     if (when <= this.ctx.currentTime) {
       this.late++;
+      this.anchor = null;
       return;
     }
 
