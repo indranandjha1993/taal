@@ -74,7 +74,7 @@ import "unsafe"
 // is found and reused rather than piling up duplicates.
 const (
 	routingName = "taal output"
-	routingUID  = "in.orrava.taal.output"
+	routingUID  = "space.injha.taal.output"
 )
 
 func cfstr(s string) C.CFStringRef {
