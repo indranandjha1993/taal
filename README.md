@@ -52,10 +52,16 @@ macos gives no app direct access to system output. BlackHole is the usual one:
 brew install blackhole-2ch
 ```
 
-Then set the mac output to BlackHole, or to a multi-output device if you also
-want the mac speakers live. taal lists the capture devices and marks the
-loopback ones, and picks one for you if it finds it. A plain microphone is
-also selectable but it captures the room rather than the music.
+The host page owns both ends of that chain. The first dropdown is where the
+mac sends its audio, the second is what taal listens to, and taal warns you
+when the two do not meet, which is the failure that is otherwise completely
+silent. Changing the first one changes the real system output, so there is no
+trip to Audio MIDI Setup.
+
+To keep the mac speakers live as well as streaming, build a multi output
+device in Audio MIDI Setup containing both your speakers and BlackHole, then
+pick it in the first dropdown. Note the mac then plays instantly while the
+phones stay a buffer behind, so in one room you hear both.
 
 Each speaker names itself when it joins, and that name is what the host sees
 in the mixer, so a row can be turned down or muted without guessing whose

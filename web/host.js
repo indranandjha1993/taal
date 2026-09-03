@@ -98,15 +98,61 @@ async function loadSources() {
   // a microphone would capture the room instead of the music, so start on
   // a loopback device if one exists
   const loop = devs.find((d) => d.loopback);
-  if (loop) {
-    sel.value = loop.name;
-    el('hint').textContent = 'captures whatever this mac plays';
+  if (loop) sel.value = loop.name;
+  checkChain();
+}
+
+async function loadOutputs() {
+  const devs = await (await fetch('/outputs')).json();
+  const sel = el('output');
+  sel.innerHTML = '';
+  for (const d of devs) {
+    const opt = document.createElement('option');
+    opt.value = d.name;
+    opt.textContent = d.feeds ? `${d.name} (reaches taal)` : d.name;
+    if (d.current) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  checkChain();
+}
+
+// the two settings only work as a pair: the mac has to be playing into
+// something taal is listening to. saying so here is the whole point,
+// because otherwise the failure is silent.
+function checkChain() {
+  const out = el('output');
+  const src = el('source');
+  const chosen = out.selectedOptions[0];
+  const feeds = chosen && chosen.textContent.includes('reaches taal');
+
+  if (!feeds) {
+    el('outHint').textContent =
+      'this goes straight to the speakers, so taal hears nothing. '
+      + 'pick a device marked "reaches taal".';
+    el('outHint').className = 'warn';
   } else {
-    el('hint').textContent =
-      'no loopback device found. install blackhole to capture system audio, '
-      + 'otherwise you are about to stream a microphone.';
+    el('outHint').textContent = 'the mac plays here and taal can hear it';
+    el('outHint').className = '';
+  }
+
+  const srcOpt = src.selectedOptions[0];
+  if (srcOpt && !srcOpt.textContent.includes('system audio')) {
+    el('hint').textContent = 'this is a microphone, it captures the room not the music';
+    el('hint').className = 'warn';
+  } else {
+    el('hint').textContent = 'picks up what the mac is playing';
+    el('hint').className = '';
   }
 }
+
+el('output').addEventListener('change', async (e) => {
+  const res = await fetch(`/outputs?name=${encodeURIComponent(e.target.value)}`,
+    { method: 'POST' });
+  if (!res.ok) el('outHint').textContent = 'could not switch the output';
+  await loadOutputs();
+});
+
+el('source').addEventListener('change', checkChain);
 
 el('start').addEventListener('click', () => {
   ws.send(JSON.stringify({ type: 'start', source: el('source').value }));
@@ -125,5 +171,6 @@ el('delay').addEventListener('change', (e) => {
 });
 
 loadSources();
+loadOutputs();
 
 connect();

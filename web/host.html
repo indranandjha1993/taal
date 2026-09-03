@@ -13,11 +13,19 @@
   <img id="qr" src="/qr.png" alt="join code" class="qr">
   <p class="sub">scan to join, or open <b id="url"></b></p>
 
-  <label class="field">
-    <span>capture from</span>
-    <select id="source"></select>
-    <small id="hint"></small>
-  </label>
+  <div class="chain">
+    <label class="field">
+      <span>1. mac plays into</span>
+      <select id="output"></select>
+      <small id="outHint"></small>
+    </label>
+
+    <label class="field">
+      <span>2. taal listens to</span>
+      <select id="source"></select>
+      <small id="hint"></small>
+    </label>
+  </div>
 
   <div class="row">
     <button id="start" class="big">start streaming</button>

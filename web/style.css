@@ -225,3 +225,33 @@ input[type="range"] {
 
 .awake.ok { color: var(--dim); }
 .awake.warn { color: var(--accent); }
+
+.chain {
+  margin: 24px 0 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.chain .field { margin: 0 0 16px; }
+.chain .field:last-child { margin-bottom: 0; }
+
+select {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #14161b;
+  color: var(--fg);
+  font: inherit;
+}
+
+.field small {
+  display: block;
+  margin-top: 6px;
+  color: var(--dim);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.field small.warn { color: var(--accent); }

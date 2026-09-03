@@ -38,6 +38,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/join", page("join.html"))
 	mux.HandleFunc("/ws", s.handleWS)
 	mux.HandleFunc("/sources", s.handleSources)
+	mux.HandleFunc("/outputs", s.handleOutputs)
 	mux.HandleFunc("/qr.png", s.handleQR)
 
 	return mux
@@ -70,6 +71,24 @@ func (s *server) handleSources(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(marshal(out))
+}
+
+// where the mac sends its audio. picking a capture source is useless if the
+// mac is still playing straight out of its speakers, so taal owns both ends
+// rather than sending people into Audio MIDI Setup.
+func (s *server) handleOutputs(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		name := r.URL.Query().Get("name")
+		if !setOutput(name) {
+			http.Error(w, "could not switch output", http.StatusBadRequest)
+			return
+		}
+		s.broadcast(map[string]any{"type": "output", "name": currentOutputName()})
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(marshal(outputDevices()))
 }
 
 func (s *server) handleQR(w http.ResponseWriter, r *http.Request) {

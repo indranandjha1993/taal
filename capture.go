@@ -60,7 +60,19 @@ func (c *capture) devices() ([]device, error) {
 // devices that carry system output back in as an input.
 func isLoopback(name string) bool {
 	n := strings.ToLower(name)
-	for _, hint := range []string{"blackhole", "loopback", "soundflower", "aggregate", "multi-output"} {
+	for _, hint := range []string{"blackhole", "soundflower", "loopback"} {
+		if strings.Contains(n, hint) {
+			return true
+		}
+	}
+	return false
+}
+
+// a multi output or aggregate device can feed a loopback while also
+// keeping the mac speakers live, which is what most people want
+func isAggregate(name string) bool {
+	n := strings.ToLower(name)
+	for _, hint := range []string{"aggregate", "multi-output", "multi output", "capture"} {
 		if strings.Contains(n, hint) {
 			return true
 		}
