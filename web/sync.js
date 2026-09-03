@@ -1,0 +1,177 @@
+// Clock sync and live playback.
+//
+// The host owns the clock and captures whatever it is playing. Every chunk
+// arrives stamped with the host time at which its first sample should be
+// heard. A speaker measures its offset from the host clock, converts that
+// stamp into its own audio clock, and schedules the chunk there. Nothing is
+// ever played "as soon as it arrives", which is what keeps devices together.
+
+const SYNC_BURST = 8;        // pings per round, keep the least delayed one
+const RESYNC_MS = 15000;
+const MAGIC = 0x4c414154;    // "TAAL"
+const HEADER = 20;           // magic + startAt + seq
+
+export class Clock {
+  constructor(ws) {
+    this.ws = ws;
+    this.offset = 0;         // hostTime - localTime
+    this.base = null;        // first offset seen, the display baseline
+    this.drift = 0;          // how far the offset has moved since then
+    this.rtt = 0;
+    this.best = null;
+    this.ready = false;
+  }
+
+  accept(t0, hostTs) {
+    const t1 = performance.now();
+    const rtt = t1 - t0;
+    // assume the trip is symmetric: host clock at t1 was hostTs + rtt/2
+    const offset = hostTs + rtt / 2 - t1;
+    if (!this.best || rtt < this.best.rtt) {
+      this.best = { rtt, offset };
+      // the raw offset is dominated by the gap between the two time
+      // origins, epoch against page load, which says nothing about sync
+      // quality. what is worth watching is how much it moves.
+      if (this.base === null) this.base = offset;
+      this.drift = offset - this.base;
+      this.offset = offset;
+      this.rtt = rtt;
+      this.ready = true;
+    }
+  }
+
+  ping() {
+    this.best = null;
+    for (let i = 0; i < SYNC_BURST; i++) {
+      setTimeout(() => {
+        if (this.ws.readyState === WebSocket.OPEN) {
+          this.ws.send(JSON.stringify({ type: 'sync', t0: performance.now() }));
+        }
+      }, i * 40);
+    }
+  }
+
+  start() {
+    this.ping();
+    this.timer = setInterval(() => this.ping(), RESYNC_MS);
+  }
+
+  stop() {
+    clearInterval(this.timer);
+  }
+
+  now() {
+    return performance.now() + this.offset;
+  }
+}
+
+export class LivePlayer {
+  constructor(clock, onState) {
+    this.clock = clock;
+    this.onState = onState;
+    this.ctx = null;
+    this.gain = null;
+    this.volume = 1;
+    this.nudgeMs = 0;
+    this.rate = 48000;
+    this.channels = 2;
+    this.queued = 0;         // chunks scheduled but not yet played
+    this.late = 0;           // chunks that arrived past their play time
+    this.played = 0;
+    this.lastLeadMs = 0;
+  }
+
+  // must be called from a user gesture, browsers refuse audio otherwise
+  async unlock() {
+    if (!this.ctx) {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)({
+        sampleRate: this.rate,
+      });
+      this.gain = this.ctx.createGain();
+      this.gain.connect(this.ctx.destination);
+      this.gain.gain.value = this.volume;
+    }
+    if (this.ctx.state === 'suspended') await this.ctx.resume();
+  }
+
+  setVolume(v) {
+    this.volume = Math.min(1, Math.max(0, v));
+    if (this.gain) {
+      // a ramp instead of a jump, a step in gain is an audible click
+      this.gain.gain.setTargetAtTime(this.volume, this.ctx.currentTime, 0.02);
+    }
+  }
+
+  setNudge(ms) {
+    this.nudgeMs = ms;
+  }
+
+  // total delay between ctx.currentTime and sound leaving the speaker
+  outputLatency() {
+    const base = this.ctx.baseLatency || 0;
+    const out = this.ctx.outputLatency || 0;
+    return (base + out) * 1000;
+  }
+
+  // the whole scheduling decision lives here: convert a host timestamp into
+  // a moment on this device's audio clock
+  hostToAudio(hostMs) {
+    const aheadMs = hostMs - this.clock.now() - this.nudgeMs
+      - this.outputLatency();
+    return this.ctx.currentTime + aheadMs / 1000;
+  }
+
+  push(buf) {
+    if (!this.ctx || !this.clock.ready) return;
+
+    const view = new DataView(buf);
+    if (view.getUint32(0, true) !== MAGIC) return;
+    const startAt = view.getFloat64(4, true);
+
+    const when = this.hostToAudio(startAt);
+    const leadMs = (when - this.ctx.currentTime) * 1000;
+    this.lastLeadMs = leadMs;
+
+    // already past due. playing it now would be out of sync with every
+    // other speaker, and a partial chunk clicks, so drop it.
+    if (when <= this.ctx.currentTime) {
+      this.late++;
+      return;
+    }
+
+    const pcm = new Int16Array(buf, HEADER);
+    const frames = pcm.length / this.channels;
+    if (frames < 1) return;
+
+    const audio = this.ctx.createBuffer(this.channels, frames, this.rate);
+    for (let ch = 0; ch < this.channels; ch++) {
+      const out = audio.getChannelData(ch);
+      for (let i = 0; i < frames; i++) {
+        out[i] = pcm[i * this.channels + ch] / 32768;
+      }
+    }
+
+    const src = this.ctx.createBufferSource();
+    src.buffer = audio;
+    src.connect(this.gain);
+    src.start(when);
+    this.queued++;
+    this.played++;
+    src.onended = () => { this.queued--; };
+
+    if (this.onState) {
+      this.onState({ leadMs, late: this.late, played: this.played });
+    }
+  }
+
+  configure(rate, channels) {
+    this.rate = rate || this.rate;
+    this.channels = channels || this.channels;
+  }
+
+  stop() {
+    // nothing to tear down: chunks are fire and forget, they finish on
+    // their own and no new ones arrive once the host stops
+    this.queued = 0;
+  }
+}
