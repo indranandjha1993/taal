@@ -158,3 +158,50 @@ func TestChunkTimestampsAdvance(t *testing.T) {
 		t.Fatalf("first chunk only %.0fms ahead, want about %d", lead, defaultDelayMs)
 	}
 }
+
+// The routing device outlives the process, so a second run, a crash or a
+// dozen restarts must never leave a pile of them behind.
+func TestRoutingIsSingletonAndCleansUp(t *testing.T) {
+	var loop string
+	for _, d := range outputDevices() {
+		if isLoopback(d.Name) {
+			loop = d.Name
+			break
+		}
+	}
+	if loop == "" {
+		t.Skip("no loopback driver on this machine")
+	}
+
+	count := func() int {
+		n := 0
+		for _, d := range outputDevices() {
+			if d.Name == routingName {
+				n++
+			}
+		}
+		return n
+	}
+
+	orig := currentOutputName()
+	defer func() {
+		removeRouting()
+		if orig != "" {
+			setOutput(orig)
+		}
+	}()
+
+	for i := 0; i < 3; i++ {
+		if _, ok := buildRouting(loop, ""); !ok {
+			t.Fatalf("build %d failed", i)
+		}
+		if n := count(); n != 1 {
+			t.Fatalf("after build %d: %d routing devices, want 1", i, n)
+		}
+	}
+
+	removeRouting()
+	if n := count(); n != 0 {
+		t.Fatalf("after cleanup: %d routing devices, want 0", n)
+	}
+}

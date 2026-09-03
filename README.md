@@ -48,10 +48,16 @@ else scans, the capture source picker, and the mixer.
 Press start and play something. That is the whole flow.
 
 Behind that button: macos gives no app direct access to system audio, so a
-small loopback driver is needed. If it is missing the host page says so and
-offers to install it. taal then builds its own output device, points the mac
-at it, and puts everything back the way it was when you stop. Nobody needs to
-open Audio MIDI Setup or learn what a loopback device is.
+small loopback driver is needed. If it is missing the host page shows only an
+explanation and an install button, never a start button that cannot work.
+taal then builds its own output device, points the mac at it, and puts
+everything back the way it was when you stop. Nobody needs to open Audio MIDI
+Setup or learn what a loopback device is.
+
+That device is a singleton with a fixed identifier, so running taal twice or
+restarting it a hundred times leaves exactly one, and stopping leaves none.
+It outlives the process though, so if taal is killed rather than stopped, the
+next start notices, puts the output back and clears the device away.
 
 "keep playing on this mac too" decides whether the mac speakers stay live
 while streaming. Leave it on and the mac plays immediately while the phones

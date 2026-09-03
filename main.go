@@ -23,6 +23,13 @@ func main() {
 	defer cap.close()
 
 	s := newServer(cap)
+	cleanupOnSignal(s)
+
+	// a previous run may have died holding the audio output
+	if note := recoverFromCrash(); note != "" {
+		fmt.Println()
+		fmt.Println("  " + note)
+	}
 
 	// in a container the detected address belongs to the container, which
 	// nothing on the wifi can reach, so allow it to be told

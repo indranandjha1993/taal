@@ -318,6 +318,9 @@ func (s *server) startStream(audible bool) {
 	s.source = source
 	s.prevOut = prev
 	s.keepAudible = audible
+	// on disk too: the device outlives a crash, so the way back has to
+	// survive one as well
+	rememberOutput(prev)
 	s.epoch = 0 // set by the first chunk, when capture is really running
 	s.fanout(s.stateMsg())
 	s.mu.Unlock()
@@ -338,6 +341,7 @@ func (s *server) stopStream() {
 		setOutput(prev)
 	}
 	removeRouting()
+	forgetOutput()
 
 	s.mu.Lock()
 	s.fanout(s.stateMsg())
