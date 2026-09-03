@@ -161,7 +161,14 @@ func TestChunkTimestampsAdvance(t *testing.T) {
 
 // The routing device outlives the process, so a second run, a crash or a
 // dozen restarts must never leave a pile of them behind.
+//
+// This one drives the real audio system, so it is skipped when a taal is
+// already running: it would fight the live server for the same device.
 func TestRoutingIsSingletonAndCleansUp(t *testing.T) {
+	if currentOutputName() == routingName {
+		t.Skip("a taal server is streaming, leave its device alone")
+	}
+
 	var loop string
 	for _, d := range outputDevices() {
 		if isLoopback(d.Name) {

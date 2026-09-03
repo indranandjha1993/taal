@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"sort"
 	"sync"
@@ -20,6 +21,7 @@ type client struct {
 	conn  *websocket.Conn
 	send  chan []byte
 	audio chan []byte
+	local bool // connected from the mac running taal
 	guest bool
 	id    string
 	seq   int
@@ -63,6 +65,7 @@ func (s *server) handleWS(w http.ResponseWriter, r *http.Request) {
 		conn:  conn,
 		send:  make(chan []byte, 16),
 		audio: make(chan []byte, 24), // about half a second of chunks
+		local: isLoopbackAddr(r.RemoteAddr),
 	}
 	go c.writePump()
 	s.readPump(c)
@@ -124,6 +127,27 @@ func (s *server) readPump(c *client) {
 	}
 }
 
+// A speaker on the host mac would play the stream back into the very device
+// taal is capturing, so the audio would echo itself every buffer length.
+// Recognising those connections lets the page offer host controls instead.
+func isLoopbackAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if ip.IsLoopback() {
+			return true
+		}
+		for _, own := range localIPs() {
+			if own.Equal(ip) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // non-blocking so one stuck client never stalls the hub
 func (c *client) trySend(msg []byte) {
 	select {
@@ -164,7 +188,9 @@ func (s *server) hello(c *client, guest bool, name string) {
 	}
 	s.clients[c] = true
 
-	c.trySend(marshal(map[string]any{"type": "you", "id": c.id, "name": c.name}))
+	c.trySend(marshal(map[string]any{
+		"type": "you", "id": c.id, "name": c.name, "local": c.local,
+	}))
 	c.trySend(s.stateMsg())
 	s.fanout(s.rosterMsg())
 	s.mu.Unlock()

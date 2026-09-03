@@ -61,6 +61,8 @@ h1 small {
 
 .big:disabled { opacity: 0.35; cursor: default; }
 
+a.big { text-decoration: none; text-align: center; box-sizing: border-box; }
+
 .big.ghost {
   background: transparent;
   border: 1px solid var(--line);

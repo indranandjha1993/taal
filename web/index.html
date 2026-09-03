@@ -9,23 +9,13 @@
 <body>
 <main class="wrap">
   <h1>taal</h1>
-  <p class="sub">whatever the mac plays, every phone plays too</p>
+  <p class="sub" id="sub">whatever the mac plays, every phone plays too</p>
 
-  <div class="choice">
-    <a class="card accent" href="/join">
-      <span class="card-title">join as a speaker</span>
-      <span class="card-note">this device becomes one of the speakers.
-      pick this on a phone.</span>
-    </a>
-    <a class="card" href="/host">
-      <span class="card-title">host the room</span>
-      <span class="card-note">choose what to capture and control the mix.
-      only on the mac running taal.</span>
-    </a>
-  </div>
+  <div class="choice" id="choice"></div>
 
-  <p class="tip">the music comes from the mac, not from the phones. play it
-  there and the phones follow. everything stays on this network.</p>
+  <p class="tip" id="tip">the music comes from the mac, not from the phones.
+  play it there and the phones follow. everything stays on this network.</p>
 </main>
+<script type="module" src="index.js"></script>
 </body>
 </html>

@@ -64,6 +64,12 @@ function handle(msg) {
       if (joined) setState(msg.streaming ? 'playing' : 'waiting for the host');
       break;
 
+    case 'you':
+      // playing here would feed taal its own capture, so say so rather
+      // than letting someone create an echo they cannot explain
+      if (msg.local) blockSelfPlayback();
+      break;
+
     case 'gain':
       // the host moved this speaker on the mixer
       player.setVolume(msg.gain);
@@ -87,6 +93,14 @@ function onTick({ leadMs, late }) {
 
 function setState(text) {
   el('state').textContent = text;
+}
+
+function blockSelfPlayback() {
+  el('setup').hidden = true;
+  el('panel').hidden = true;
+  const warn = el('selfWarn');
+  warn.hidden = false;
+  if (ws) ws.close();
 }
 
 function showAwake(state) {

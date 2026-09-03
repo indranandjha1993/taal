@@ -38,6 +38,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/join", page("join.html"))
 	mux.HandleFunc("/ws", s.handleWS)
 	mux.HandleFunc("/setup", s.handleSetup)
+	mux.HandleFunc("/whoami", s.handleWhoami)
 	mux.HandleFunc("/qr.png", s.handleQR)
 
 	return mux
@@ -79,6 +80,23 @@ func (s *server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		"detail":    setup.Detail,
 		"installer": setup.Installer,
 		"command":   installCommand(),
+	}))
+}
+
+// Lets the landing page stop asking a question it can answer itself: this
+// device either is the mac running taal or it is not, and the stream is
+// either live or it is not.
+func (s *server) handleWhoami(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	streaming := s.streaming
+	speakers := s.guestCount()
+	s.mu.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(marshal(map[string]any{
+		"host":      isLoopbackAddr(r.RemoteAddr),
+		"streaming": streaming,
+		"speakers":  speakers,
 	}))
 }
 

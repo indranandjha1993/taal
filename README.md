@@ -50,9 +50,18 @@ is not one, so over http a phone cannot keep itself awake. The tradeoff is
 that each phone shows a certificate warning the first time, which you accept
 once. Pass `-http` to serve plain http instead and give that up.
 
-It prints two URLs. Opening the root address gives a choice of hosting the
-room or joining as a speaker. The host page carries the QR code that everyone
-else scans, the capture source picker, and the mixer.
+Opening the root address on the mac gives the host controls, and on any other
+device gives the speaker page. It does not ask which one you want, because it
+already knows: the mac running taal is the source and every other device is a
+speaker.
+
+The mac deliberately cannot join as a speaker. It would play the stream back
+into the very device taal is capturing, so the audio would echo itself once
+per buffer and build up. Both the landing page and the speaker page say so
+rather than letting someone create that by accident.
+
+The host page carries the QR code that everyone else scans, the start button,
+and the mixer.
 
 Press start and play something. That is the whole flow.
 
