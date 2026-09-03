@@ -89,8 +89,11 @@ Two things that will ruin the result no matter how good the sync is:
 
 - **Bluetooth speakers and headphones.** They add 100 to 300ms and it drifts.
   Built in speakers or wired only.
-- **A locked screen.** Phones suspend the tab and audio stops. The page asks
-  for a wake lock but the screen has to stay on.
+- **A locked screen.** The page takes a wake lock and claims a media session,
+  which is enough on android to keep the screen on and the audio running. ios
+  is different: safari drops the lock whenever the phone is locked or the tab
+  leaves the foreground, and stops the audio with it. No web page can override
+  that. The speaker page says which of the two you are getting.
 
 ## Measuring it instead of guessing
 
