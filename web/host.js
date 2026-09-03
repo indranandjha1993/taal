@@ -1,39 +1,88 @@
 const el = (id) => document.getElementById(id);
 
 let ws;
+let streaming = false;
 let dragging = null;
 
 el('url').textContent = location.host;
 
+// The server holds the truth about whether audio is flowing, so reopening
+// this page reads it back rather than assuming a fresh start. Closing the
+// tab never stops the stream.
 function connect() {
   // a secure page cannot open an insecure socket
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}/ws`);
 
-  ws.onopen = () => ws.send(JSON.stringify({ type: 'hello', role: 'host' }));
-  ws.onclose = () => setTimeout(connect, 2000);
+  ws.onopen = () => {
+    setConn('connected', true);
+    ws.send(JSON.stringify({ type: 'hello', role: 'host' }));
+    checkSetup();
+  };
+
+  ws.onclose = () => {
+    setConn('lost the server, retrying', false);
+    setTimeout(connect, 2000);
+  };
 
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
-    if (msg.type === 'roster') renderMixer(msg.speakers);
-    if (msg.type === 'state') {
-      el('start').disabled = msg.streaming;
-      el('stop').disabled = !msg.streaming;
-      if (msg.streaming) el('source').value = msg.source;
-      el('delay').value = msg.delayMs;
-      el('delayVal').textContent = `${msg.delayMs} ms`;
-    }
-    if (msg.type === 'error') el('hint').textContent = msg.msg;
+    if (msg.type === 'roster') renderSpeakers(msg.speakers);
+    if (msg.type === 'state') applyState(msg);
+    if (msg.type === 'error') showError(msg.msg);
   };
 }
 
-function renderMixer(speakers) {
-  el('count').textContent =
-    `${speakers.length} speaker${speakers.length === 1 ? '' : 's'}`;
+function setConn(text, ok) {
+  const c = el('conn');
+  c.textContent = text;
+  c.className = ok ? 'conn ok' : 'conn warn';
+}
+
+function applyState(msg) {
+  streaming = msg.streaming;
+  el('power').textContent = streaming ? 'stop streaming' : 'start streaming';
+  el('power').className = streaming ? 'big ghost' : 'big';
+  el('audible').checked = msg.audible;
+  el('audible').disabled = streaming;
+  el('delay').value = msg.delayMs;
+  el('delayVal').textContent = `${msg.delayMs} ms`;
+  el('playing').className = 'tip';
+  el('playing').textContent = streaming
+    ? 'streaming. anything this mac plays comes out of the phones below.'
+    : 'play anything on this mac and it comes out of every phone that joins.';
+}
+
+async function checkSetup() {
+  const s = await (await fetch('/setup')).json();
+  el('setup').hidden = s.ready;
+  el('ready').hidden = !s.ready;
+  if (s.ready) return;
+
+  el('setupMsg').textContent = s.detail;
+  if (s.installer === 'brew') {
+    el('install').hidden = false;
+    el('setupCmd').hidden = true;
+  } else {
+    el('install').hidden = true;
+    el('setupCmd').hidden = false;
+    el('setupCmd').textContent = s.command;
+  }
+}
+
+function showError(text) {
+  el('playing').textContent = text;
+  el('playing').className = 'tip warn';
+}
+
+function renderSpeakers(speakers) {
+  el('count').textContent = speakers.length
+    ? `${speakers.length} connected`
+    : 'none yet';
 
   const box = el('speakers');
   if (!speakers.length) {
-    box.innerHTML = '<p class="empty">nobody has joined yet</p>';
+    box.innerHTML = '<p class="empty">scan the code on a phone to add one</p>';
     return;
   }
 
@@ -85,81 +134,30 @@ function setGain(id, gain) {
   ws.send(JSON.stringify({ type: 'gain', id, gain }));
 }
 
-async function loadSources() {
-  const devs = await (await fetch('/sources')).json();
-  const sel = el('source');
-  sel.innerHTML = '';
-  for (const d of devs) {
-    const opt = document.createElement('option');
-    opt.value = d.name;
-    opt.textContent = d.loopback ? `${d.name} (system audio)` : d.name;
-    sel.appendChild(opt);
-  }
-  // a microphone would capture the room instead of the music, so start on
-  // a loopback device if one exists
-  const loop = devs.find((d) => d.loopback);
-  if (loop) sel.value = loop.name;
-  checkChain();
-}
-
-async function loadOutputs() {
-  const devs = await (await fetch('/outputs')).json();
-  const sel = el('output');
-  sel.innerHTML = '';
-  for (const d of devs) {
-    const opt = document.createElement('option');
-    opt.value = d.name;
-    opt.textContent = d.feeds ? `${d.name} (reaches taal)` : d.name;
-    if (d.current) opt.selected = true;
-    sel.appendChild(opt);
-  }
-  checkChain();
-}
-
-// the two settings only work as a pair: the mac has to be playing into
-// something taal is listening to. saying so here is the whole point,
-// because otherwise the failure is silent.
-function checkChain() {
-  const out = el('output');
-  const src = el('source');
-  const chosen = out.selectedOptions[0];
-  const feeds = chosen && chosen.textContent.includes('reaches taal');
-
-  if (!feeds) {
-    el('outHint').textContent =
-      'this goes straight to the speakers, so taal hears nothing. '
-      + 'pick a device marked "reaches taal".';
-    el('outHint').className = 'warn';
+el('power').addEventListener('click', () => {
+  if (streaming) {
+    ws.send(JSON.stringify({ type: 'stop' }));
   } else {
-    el('outHint').textContent = 'the mac plays here and taal can hear it';
-    el('outHint').className = '';
+    el('playing').className = 'tip';
+    ws.send(JSON.stringify({ type: 'start', audible: el('audible').checked }));
   }
-
-  const srcOpt = src.selectedOptions[0];
-  if (srcOpt && !srcOpt.textContent.includes('system audio')) {
-    el('hint').textContent = 'this is a microphone, it captures the room not the music';
-    el('hint').className = 'warn';
-  } else {
-    el('hint').textContent = 'picks up what the mac is playing';
-    el('hint').className = '';
-  }
-}
-
-el('output').addEventListener('change', async (e) => {
-  const res = await fetch(`/outputs?name=${encodeURIComponent(e.target.value)}`,
-    { method: 'POST' });
-  if (!res.ok) el('outHint').textContent = 'could not switch the output';
-  await loadOutputs();
 });
 
-el('source').addEventListener('change', checkChain);
-
-el('start').addEventListener('click', () => {
-  ws.send(JSON.stringify({ type: 'start', source: el('source').value }));
-});
-
-el('stop').addEventListener('click', () => {
-  ws.send(JSON.stringify({ type: 'stop' }));
+el('install').addEventListener('click', async () => {
+  el('install').disabled = true;
+  el('install').textContent = 'installing, this takes a minute';
+  const res = await fetch('/setup', { method: 'POST' });
+  const out = await res.json();
+  el('install').disabled = false;
+  el('install').textContent = 'set up audio for me';
+  if (out.ok) {
+    el('setupMsg').textContent = 'installed, checking again';
+    setTimeout(checkSetup, 1500);
+  } else {
+    el('setupMsg').textContent = out.detail || 'that did not work';
+    el('setupCmd').hidden = false;
+    el('setupCmd').textContent = out.command;
+  }
 });
 
 el('delay').addEventListener('input', (e) => {
@@ -169,8 +167,5 @@ el('delay').addEventListener('input', (e) => {
 el('delay').addEventListener('change', (e) => {
   ws.send(JSON.stringify({ type: 'delay', ms: Number(e.target.value) }));
 });
-
-loadSources();
-loadOutputs();
 
 connect();

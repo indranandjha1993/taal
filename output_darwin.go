@@ -145,6 +145,20 @@ func outputDevices() []outputDevice {
 	return out
 }
 
+// device id by name, for the routing builder
+func findDeviceID(name string) (C.AudioDeviceID, bool) {
+	for i := 0; i < int(C.deviceCount()); i++ {
+		dev := C.deviceAt(C.int(i))
+		if dev == C.kAudioObjectUnknown {
+			continue
+		}
+		if nameOf(dev) == name {
+			return dev, true
+		}
+	}
+	return 0, false
+}
+
 func setOutput(name string) bool {
 	for i := 0; i < int(C.deviceCount()); i++ {
 		dev := C.deviceAt(C.int(i))

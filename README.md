@@ -45,23 +45,18 @@ It prints two URLs. Opening the root address gives a choice of hosting the
 room or joining as a speaker. The host page carries the QR code that everyone
 else scans, the capture source picker, and the mixer.
 
-To capture what the mac is playing you need a loopback audio device, because
-macos gives no app direct access to system output. BlackHole is the usual one:
+Press start and play something. That is the whole flow.
 
-```
-brew install blackhole-2ch
-```
+Behind that button: macos gives no app direct access to system audio, so a
+small loopback driver is needed. If it is missing the host page says so and
+offers to install it. taal then builds its own output device, points the mac
+at it, and puts everything back the way it was when you stop. Nobody needs to
+open Audio MIDI Setup or learn what a loopback device is.
 
-The host page owns both ends of that chain. The first dropdown is where the
-mac sends its audio, the second is what taal listens to, and taal warns you
-when the two do not meet, which is the failure that is otherwise completely
-silent. Changing the first one changes the real system output, so there is no
-trip to Audio MIDI Setup.
-
-To keep the mac speakers live as well as streaming, build a multi output
-device in Audio MIDI Setup containing both your speakers and BlackHole, then
-pick it in the first dropdown. Note the mac then plays instantly while the
-phones stay a buffer behind, so in one room you hear both.
+"keep playing on this mac too" decides whether the mac speakers stay live
+while streaming. Leave it on and the mac plays immediately while the phones
+sit a buffer behind, so in one room you hear both. Turn it off and only the
+phones make sound.
 
 Each speaker names itself when it joins, and that name is what the host sees
 in the mixer, so a row can be turned down or muted without guessing whose
@@ -136,6 +131,9 @@ a Chromecast receiver since that is an HTML page too.
 ```
 main.go          startup, LAN address detection
 tls.go           self signed certificate, generated once and reused
+setup.go         what this mac needs before it can capture
+routing_darwin.go  builds the output device so nobody visits Audio MIDI Setup
+output_darwin.go   reads and sets the system output
 capture.go       coreaudio capture, device listing
 stream.go        binary chunk framing
 server.go        routes, source listing, QR

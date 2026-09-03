@@ -255,3 +255,45 @@ select {
 }
 
 .field small.warn { color: var(--accent); }
+
+.conn {
+  margin: 0 0 20px;
+  font-size: 12px;
+}
+
+.conn.ok { color: var(--dim); }
+.conn.warn { color: var(--accent); }
+
+.setup {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  text-align: left;
+}
+
+.setup-msg { margin: 0 0 16px; font-size: 14px; line-height: 1.6; }
+
+.setup-cmd {
+  margin: 12px 0 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: #14161b;
+  color: var(--dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  user-select: all;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.check input { accent-color: var(--accent); }
+
+.tip.warn { color: var(--accent); }

@@ -10,40 +10,41 @@
 <main class="wrap wide">
   <h1>taal <small>host</small></h1>
 
-  <img id="qr" src="/qr.png" alt="join code" class="qr">
-  <p class="sub">scan to join, or open <b id="url"></b></p>
+  <div id="conn" class="conn">connecting</div>
 
-  <div class="chain">
-    <label class="field">
-      <span>1. mac plays into</span>
-      <select id="output"></select>
-      <small id="outHint"></small>
+  <section id="setup" class="setup" hidden>
+    <p class="setup-msg" id="setupMsg"></p>
+    <button id="install" class="big" hidden>set up audio for me</button>
+    <p class="setup-cmd" id="setupCmd" hidden></p>
+  </section>
+
+  <section id="ready" hidden>
+    <img id="qr" src="/qr.png" alt="join code" class="qr">
+    <p class="sub">scan to join, or open <b id="url"></b></p>
+
+    <button id="power" class="big">start streaming</button>
+
+    <label class="check">
+      <input type="checkbox" id="audible" checked>
+      <span>keep playing on this mac too</span>
     </label>
 
-    <label class="field">
-      <span>2. taal listens to</span>
-      <select id="source"></select>
-      <small id="hint"></small>
+    <p class="tip" id="playing">play anything on this mac and it comes out of
+    every phone that joins.</p>
+
+    <label class="nudge">
+      <span>delay <b id="delayVal">400 ms</b></span>
+      <input type="range" id="delay" min="100" max="1000" value="400" step="50">
+      <small>how far behind the mac the phones play. lower is tighter, too low
+      and they start dropping audio.</small>
     </label>
-  </div>
 
-  <div class="row">
-    <button id="start" class="big">start streaming</button>
-    <button id="stop" class="big ghost" disabled>stop</button>
-  </div>
-
-  <label class="nudge">
-    <span>buffer <b id="delayVal">400 ms</b></span>
-    <input type="range" id="delay" min="100" max="1000" value="400" step="50">
-    <small>how far behind the mac the speakers play. lower is tighter,
-    too low and phones start dropping audio.</small>
-  </label>
-
-  <section class="mixer">
-    <h2>mixer <span class="muted" id="count">0 speakers</span></h2>
-    <div id="speakers" class="speakers">
-      <p class="empty">nobody has joined yet</p>
-    </div>
+    <section class="mixer">
+      <h2>speakers <span class="muted" id="count">none yet</span></h2>
+      <div id="speakers" class="speakers">
+        <p class="empty">scan the code on a phone to add one</p>
+      </div>
+    </section>
   </section>
 </main>
 <script type="module" src="host.js"></script>

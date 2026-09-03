@@ -37,8 +37,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/host", page("host.html"))
 	mux.HandleFunc("/join", page("join.html"))
 	mux.HandleFunc("/ws", s.handleWS)
-	mux.HandleFunc("/sources", s.handleSources)
-	mux.HandleFunc("/outputs", s.handleOutputs)
+	mux.HandleFunc("/setup", s.handleSetup)
 	mux.HandleFunc("/qr.png", s.handleQR)
 
 	return mux
@@ -59,36 +58,28 @@ func qrTarget(reqHost string) string {
 	return reqHost
 }
 
-func (s *server) handleSources(w http.ResponseWriter, r *http.Request) {
-	devs, err := s.cap.devices()
-	if err != nil {
-		http.Error(w, "cannot list audio devices", http.StatusInternalServerError)
-		return
-	}
-	out := make([]map[string]any, 0, len(devs))
-	for _, d := range devs {
-		out = append(out, map[string]any{"name": d.Name, "loopback": d.Loop})
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(marshal(out))
-}
-
 // where the mac sends its audio. picking a capture source is useless if the
 // mac is still playing straight out of its speakers, so taal owns both ends
 // rather than sending people into Audio MIDI Setup.
-func (s *server) handleOutputs(w http.ResponseWriter, r *http.Request) {
+// What the host page needs to know before it can offer a start button:
+// whether this mac can capture its own audio yet, and if not, how to fix it.
+func (s *server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
-		name := r.URL.Query().Get("name")
-		if !setOutput(name) {
-			http.Error(w, "could not switch output", http.StatusBadRequest)
-			return
-		}
-		s.broadcast(map[string]any{"type": "output", "name": currentOutputName()})
-		w.WriteHeader(http.StatusNoContent)
+		detail, ok := runInstall()
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(marshal(map[string]any{
+			"ok": ok, "detail": detail, "command": installCommand(),
+		}))
 		return
 	}
+	setup := inspectAudio(s.cap)
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(marshal(outputDevices()))
+	w.Write(marshal(map[string]any{
+		"ready":     setup.Ready,
+		"detail":    setup.Detail,
+		"installer": setup.Installer,
+		"command":   installCommand(),
+	}))
 }
 
 func (s *server) handleQR(w http.ResponseWriter, r *http.Request) {

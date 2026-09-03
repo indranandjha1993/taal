@@ -33,11 +33,13 @@ type server struct {
 
 	seq int // ids for joining speakers
 
-	cap       *capture
-	streaming bool
-	source    string  // capture device name
-	epoch     float64 // host ms at which stream sample 0 was captured
-	delayMs   float64 // how far behind the source speakers play
+	cap         *capture
+	streaming   bool
+	source      string  // capture device name
+	prevOut     string  // system output before taal changed it
+	keepAudible bool    // also play through the mac speakers
+	epoch       float64 // host ms at which stream sample 0 was captured
+	delayMs     float64 // how far behind the source speakers play
 }
 
 func newServer(cap *capture) *server {
@@ -107,8 +109,8 @@ func (s *server) readPump(c *client) {
 			name, _ := msg["name"].(string)
 			s.hello(c, msg["role"] == "guest", name)
 		case "start":
-			src, _ := msg["source"].(string)
-			s.startStream(src)
+			audible, ok := msg["audible"].(bool)
+			s.startStream(ok && audible)
 		case "stop":
 			s.stopStream()
 		case "delay":
@@ -255,19 +257,46 @@ func (s *server) stateMsg() []byte {
 		"type":      "state",
 		"streaming": s.streaming,
 		"source":    s.source,
+		"audible":   s.keepAudible,
 		"delayMs":   s.delayMs,
 		"rate":      sampleRate,
 		"channels":  channels,
 	})
 }
 
-func (s *server) startStream(source string) {
+// Sets up the whole chain: build an output device that feeds both the
+// loopback and (optionally) the speakers, point the mac at it, then start
+// capturing. The person clicking start never sees any of this.
+func (s *server) startStream(audible bool) {
 	s.mu.Lock()
 	if s.cap == nil {
 		s.mu.Unlock()
 		return
 	}
 	s.mu.Unlock()
+
+	setup := inspectAudio(s.cap)
+	if !setup.Ready {
+		s.mu.Lock()
+		s.fanout(marshal(map[string]any{"type": "error", "msg": setup.Detail}))
+		s.mu.Unlock()
+		return
+	}
+
+	prev := currentOutputName()
+	speakers := ""
+	if audible {
+		speakers = setup.Speakers
+	}
+	if name, ok := buildRouting(setup.Loopback, speakers); ok {
+		setOutput(name)
+	} else {
+		// no routing device, fall back to sending everything to the
+		// loopback. the mac goes quiet but the stream works.
+		setOutput(setup.Loopback)
+	}
+
+	source := setup.Loopback
 
 	// the audio callback runs on its own thread and fans out directly,
 	// so the capture is started outside the lock
@@ -276,6 +305,10 @@ func (s *server) startStream(source string) {
 	s.mu.Lock()
 	if err != nil {
 		s.streaming = false
+		if prev != "" {
+			setOutput(prev)
+		}
+		removeRouting()
 		s.fanout(marshal(map[string]any{"type": "error", "msg": err.Error()}))
 		s.fanout(s.stateMsg())
 		s.mu.Unlock()
@@ -283,15 +316,30 @@ func (s *server) startStream(source string) {
 	}
 	s.streaming = true
 	s.source = source
+	s.prevOut = prev
+	s.keepAudible = audible
 	s.epoch = 0 // set by the first chunk, when capture is really running
 	s.fanout(s.stateMsg())
 	s.mu.Unlock()
 }
 
+// leaving someone's mac routed through a device taal invented would be
+// rude, so put the output back exactly as it was
 func (s *server) stopStream() {
 	s.cap.stop()
+
 	s.mu.Lock()
+	prev := s.prevOut
 	s.streaming = false
+	s.prevOut = ""
+	s.mu.Unlock()
+
+	if prev != "" {
+		setOutput(prev)
+	}
+	removeRouting()
+
+	s.mu.Lock()
 	s.fanout(s.stateMsg())
 	s.mu.Unlock()
 }

@@ -4,9 +4,11 @@ import { Awake, claimMediaSession } from './awake.js';
 const el = (id) => document.getElementById(id);
 const NUDGE_KEY = 'taal.nudge';
 const NAME_KEY = 'taal.name';
+const JOINED_KEY = 'taal.joined';
 
 let ws, clock, player;
 let joined = false;
+let left = false;
 const awake = new Awake(showAwake);
 
 function connect() {
@@ -30,9 +32,10 @@ function connect() {
   };
 
   ws.onclose = () => {
-    setState('disconnected, retrying');
     clock.stop();
     player.stop();
+    if (left) return;
+    setState('lost the host, reconnecting');
     setTimeout(connect, 2000);
   };
 
@@ -56,8 +59,8 @@ function handle(msg) {
     case 'state':
       player.configure(msg.rate, msg.channels);
       el('source').textContent = msg.streaming
-        ? msg.source
-        : 'host is not streaming';
+        ? 'the mac is streaming'
+        : 'the mac is not streaming yet';
       if (joined) setState(msg.streaming ? 'playing' : 'waiting for the host');
       break;
 
@@ -114,9 +117,26 @@ el('join').addEventListener('click', async () => {
   await awake.acquire();
   claimMediaSession(name);
   joined = true;
+  left = false;
+  localStorage.setItem(JOINED_KEY, '1');
   el('setup').hidden = true;
   el('panel').hidden = false;
   setState('waiting for the host');
+});
+
+// leaving is explicit, so a phone put down mid party does not silently
+// keep a slot in the mixer
+el('leave').addEventListener('click', () => {
+  left = true;
+  joined = false;
+  localStorage.removeItem(JOINED_KEY);
+  awake.release();
+  player.stop();
+  clock.stop();
+  ws.close();
+  el('panel').hidden = true;
+  el('setup').hidden = false;
+  el('source').textContent = 'left the room';
 });
 
 el('nudge').addEventListener('input', (e) => {
