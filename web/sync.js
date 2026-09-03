@@ -84,14 +84,76 @@ export class LivePlayer {
   // must be called from a user gesture, browsers refuse audio otherwise
   async unlock() {
     if (!this.ctx) {
-      this.ctx = new (window.AudioContext || window.webkitAudioContext)({
-        sampleRate: this.rate,
-      });
+      // never force a sample rate. ios hardware runs at 44100 and safari
+      // will not open a context at a rate it does not want, so take what
+      // the device gives and resample chunks into it instead
+      const Ctor = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new Ctor();
+
       this.gain = this.ctx.createGain();
-      this.gain.connect(this.ctx.destination);
       this.gain.gain.value = this.volume;
+      this.route();
+
+      // safari starts suspended and stays that way until a gesture, and
+      // silently ignores audio scheduled while suspended
+      this.silentKick();
     }
     if (this.ctx.state === 'suspended') await this.ctx.resume();
+  }
+
+  // Send the graph through a real audio element rather than straight to the
+  // speakers. ios treats a page with a playing media element as a media
+  // player, which is what earns the lock screen controls and stops the
+  // audio being suspended the moment the tab stops being looked at.
+  // Falling back to ctx.destination is fine, it just loses that protection.
+  route() {
+    try {
+      const sink = this.ctx.createMediaStreamDestination();
+      const el = document.createElement('audio');
+      el.srcObject = sink.stream;
+      el.autoplay = true;
+      el.playsInline = true;
+      // the element is the output, muting it would mute everything
+      el.volume = 1;
+      document.body.appendChild(el);
+      this.gain.connect(sink);
+      this.sink = sink;
+      this.sinkEl = el;
+      const p = el.play();
+      if (p && p.catch) p.catch(() => this.fallback());
+    } catch (e) {
+      this.fallback();
+    }
+  }
+
+  fallback() {
+    if (this.routedDirect) return;
+    this.routedDirect = true;
+    // drop the element route first, otherwise both paths play and the
+    // volume doubles
+    if (this.sink) {
+      try {
+        this.gain.disconnect(this.sink);
+      } catch (e) {
+        // was never connected
+      }
+      this.sink = null;
+    }
+    if (this.sinkEl) {
+      this.sinkEl.remove();
+      this.sinkEl = null;
+    }
+    this.gain.connect(this.ctx.destination);
+  }
+
+  // ios keeps the audio hardware asleep until something actually plays,
+  // so a zero length buffer inside the gesture wakes it
+  silentKick() {
+    const b = this.ctx.createBuffer(1, 1, this.ctx.sampleRate);
+    const s = this.ctx.createBufferSource();
+    s.buffer = b;
+    s.connect(this.ctx.destination);
+    s.start(0);
   }
 
   setVolume(v) {
@@ -124,6 +186,13 @@ export class LivePlayer {
   push(buf) {
     if (!this.ctx || !this.clock.ready) return;
 
+    // safari suspends the context on its own (screen dimming, app switch)
+    // and then silently swallows everything scheduled after
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+      return;
+    }
+
     const view = new DataView(buf);
     if (view.getUint32(0, true) !== MAGIC) return;
     const startAt = view.getFloat64(4, true);
@@ -143,11 +212,31 @@ export class LivePlayer {
     const frames = pcm.length / this.channels;
     if (frames < 1) return;
 
-    const audio = this.ctx.createBuffer(this.channels, frames, this.rate);
+    // the device decides its own rate. on ios that is usually 44100 while
+    // the stream is 48000, so resample or everything plays 9% fast
+    const devRate = this.ctx.sampleRate;
+    const ratio = devRate / this.rate;
+    const outFrames = Math.max(1, Math.round(frames * ratio));
+
+    const audio = this.ctx.createBuffer(this.channels, outFrames, devRate);
     for (let ch = 0; ch < this.channels; ch++) {
       const out = audio.getChannelData(ch);
-      for (let i = 0; i < frames; i++) {
-        out[i] = pcm[i * this.channels + ch] / 32768;
+      if (outFrames === frames) {
+        for (let i = 0; i < frames; i++) {
+          out[i] = pcm[i * this.channels + ch] / 32768;
+        }
+      } else {
+        // linear interpolation. chunks are 20ms so the seam error is tiny,
+        // and it beats the alternative of wrong pitch
+        for (let i = 0; i < outFrames; i++) {
+          const src = i / ratio;
+          const i0 = Math.floor(src);
+          const i1 = Math.min(frames - 1, i0 + 1);
+          const f = src - i0;
+          const a = pcm[i0 * this.channels + ch] / 32768;
+          const b = pcm[i1 * this.channels + ch] / 32768;
+          out[i] = a + (b - a) * f;
+        }
       }
     }
 
