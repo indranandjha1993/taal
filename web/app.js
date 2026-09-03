@@ -5,6 +5,18 @@ const el = (id) => document.getElementById(id);
 const NUDGE_KEY = 'taal.nudge';
 const NAME_KEY = 'taal.name';
 const JOINED_KEY = 'taal.joined';
+const ID_KEY = 'taal.id';
+
+// A reconnect must reclaim the same row in the mixer rather than adding a
+// new one, so the device carries its own id and hands it back every time.
+function deviceID() {
+  let id = localStorage.getItem(ID_KEY);
+  if (!id) {
+    id = 'd' + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem(ID_KEY, id);
+  }
+  return id;
+}
 
 let ws, clock, player;
 let joined = false;
@@ -26,6 +38,7 @@ function connect() {
       type: 'hello',
       role: 'guest',
       name: localStorage.getItem(NAME_KEY) || '',
+      id: deviceID(),
     }));
     clock.start();
     setState('connected');
@@ -111,7 +124,7 @@ el('join').addEventListener('click', async () => {
   const name = el('name').value.trim();
   if (name) {
     localStorage.setItem(NAME_KEY, name);
-    ws.send(JSON.stringify({ type: 'hello', role: 'guest', name }));
+    ws.send(JSON.stringify({ type: 'hello', role: 'guest', name, id: deviceID() }));
   }
   await player.unlock();
   await awake.acquire();

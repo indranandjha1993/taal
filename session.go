@@ -17,6 +17,16 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
+// A phone that sleeps, loses wifi or is swiped away never closes its socket,
+// so without this the server believes it is still there and the mixer fills
+// up with speakers that left. Ping often enough that a stale row disappears
+// while someone is still looking at the screen.
+const (
+	pingEvery   = 5 * time.Second
+	pongTimeout = 12 * time.Second
+	writeWait   = 10 * time.Second
+)
+
 type client struct {
 	conn  *websocket.Conn
 	send  chan []byte
@@ -72,13 +82,19 @@ func (s *server) handleWS(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *client) writePump() {
-	defer c.conn.Close()
+	ping := time.NewTicker(pingEvery)
+	defer func() {
+		ping.Stop()
+		c.conn.Close()
+	}()
+
 	for {
 		select {
 		case msg, ok := <-c.send:
 			if !ok {
 				return
 			}
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if c.conn.WriteMessage(websocket.TextMessage, msg) != nil {
 				return
 			}
@@ -86,7 +102,13 @@ func (c *client) writePump() {
 			if !ok {
 				return
 			}
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if c.conn.WriteMessage(websocket.BinaryMessage, pcm) != nil {
+				return
+			}
+		case <-ping.C:
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if c.conn.WriteMessage(websocket.PingMessage, nil) != nil {
 				return
 			}
 		}
@@ -95,11 +117,19 @@ func (c *client) writePump() {
 
 func (s *server) readPump(c *client) {
 	defer s.drop(c)
+
+	// every pong, and every message, proves the far end is still there
+	c.conn.SetReadDeadline(time.Now().Add(pongTimeout))
+	c.conn.SetPongHandler(func(string) error {
+		return c.conn.SetReadDeadline(time.Now().Add(pongTimeout))
+	})
+
 	for {
 		_, raw, err := c.conn.ReadMessage()
 		if err != nil {
 			return
 		}
+		c.conn.SetReadDeadline(time.Now().Add(pongTimeout))
 		var msg map[string]any
 		if json.Unmarshal(raw, &msg) != nil {
 			continue
@@ -110,7 +140,8 @@ func (s *server) readPump(c *client) {
 			c.trySend(marshal(map[string]any{"type": "sync", "t0": t0, "ts": nowMs()}))
 		case "hello":
 			name, _ := msg["name"].(string)
-			s.hello(c, msg["role"] == "guest", name)
+			id, _ := msg["id"].(string)
+			s.hello(c, msg["role"] == "guest", name, id)
 		case "start":
 			audible, ok := msg["audible"].(bool)
 			s.startStream(ok && audible)
@@ -173,11 +204,38 @@ func marshal(v any) []byte {
 	return b
 }
 
-func (s *server) hello(c *client, guest bool, name string) {
+func (s *server) hello(c *client, guest bool, name, want string) {
 	s.mu.Lock()
 	c.guest = guest
 	c.name = name
 	c.gain = 1
+
+	// A device that reconnects brings the id it was given before. Retiring
+	// the old connection keeps one row per device instead of a new row for
+	// every wifi hiccup, and carries its volume across.
+	if want != "" {
+		for old := range s.clients {
+			if old.id == want && old != c {
+				c.seq = old.seq
+				c.gain = old.gain
+				delete(s.clients, old)
+				close(old.send)
+				if old.audio != nil {
+					close(old.audio)
+				}
+				if old.conn != nil {
+					old.conn.Close()
+				}
+				break
+			}
+		}
+		c.id = want
+		if c.seq == 0 {
+			s.seq++
+			c.seq = s.seq
+		}
+	}
+
 	if c.id == "" {
 		s.seq++
 		c.seq = s.seq

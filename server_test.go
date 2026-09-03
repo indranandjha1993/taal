@@ -44,7 +44,7 @@ func TestQRTargetsReachableHost(t *testing.T) {
 
 func TestHostIsNotCountedAsListener(t *testing.T) {
 	s := newServer(&capture{})
-	s.hello(&client{send: make(chan []byte, 8)}, false, "")
+	s.hello(&client{send: make(chan []byte, 8)}, false, "", "")
 
 	s.mu.Lock()
 	n := s.guestCount()
@@ -61,7 +61,7 @@ func TestHostIsNotCountedAsListener(t *testing.T) {
 func TestCountsStayOrderedUnderChurn(t *testing.T) {
 	s := newServer(&capture{})
 	watcher := &client{send: make(chan []byte, 512)}
-	s.hello(watcher, false, "")
+	s.hello(watcher, false, "", "")
 
 	const n = 40
 	var wg sync.WaitGroup
@@ -74,7 +74,7 @@ func TestCountsStayOrderedUnderChurn(t *testing.T) {
 				for range c.send {
 				}
 			}()
-			s.hello(c, true, "")
+			s.hello(c, true, "", "")
 			s.drop(c)
 		}()
 	}
@@ -91,6 +91,48 @@ func TestCountsStayOrderedUnderChurn(t *testing.T) {
 
 // a speaker joining mid stream must be told what is going on, otherwise it
 // sits silent until the host happens to change something
+// A phone that drops off and comes back must reclaim its row rather than
+// adding another. This is the three-Oppos bug.
+func TestReconnectReplacesInsteadOfDuplicating(t *testing.T) {
+	s := newServer(&capture{})
+
+	first := &client{send: make(chan []byte, 8), audio: make(chan []byte, 4)}
+	go drain(first)
+	s.hello(first, true, "Oppo", "dev-abc")
+	s.setGain("dev-abc", 0.4)
+
+	// same device, new socket, same id
+	second := &client{send: make(chan []byte, 8), audio: make(chan []byte, 4)}
+	go drain(second)
+	s.hello(second, true, "Oppo", "dev-abc")
+
+	s.mu.Lock()
+	n := s.guestCount()
+	gain := second.gain
+	s.mu.Unlock()
+
+	if n != 1 {
+		t.Fatalf("%d speakers after a reconnect, want 1", n)
+	}
+	if gain != 0.4 {
+		t.Fatalf("volume was %v after reconnect, want it carried across", gain)
+	}
+
+	// the stale connection being dropped later must not resurrect a row
+	s.drop(first)
+	s.mu.Lock()
+	n = s.guestCount()
+	s.mu.Unlock()
+	if n != 1 {
+		t.Fatalf("%d speakers after the stale drop, want 1", n)
+	}
+}
+
+func drain(c *client) {
+	for range c.send {
+	}
+}
+
 func TestJoinerLearnsStreamState(t *testing.T) {
 	s := newServer(&capture{})
 	s.streaming = true
@@ -98,7 +140,7 @@ func TestJoinerLearnsStreamState(t *testing.T) {
 	s.delayMs = defaultDelayMs
 
 	c := &client{send: make(chan []byte, 8), audio: make(chan []byte, 4)}
-	s.hello(c, true, "")
+	s.hello(c, true, "", "")
 
 	var got map[string]any
 	for len(c.send) > 0 {
@@ -123,7 +165,7 @@ func TestChunkTimestampsAdvance(t *testing.T) {
 	s.delayMs = defaultDelayMs
 
 	c := &client{send: make(chan []byte, 4), audio: make(chan []byte, 16)}
-	s.hello(c, true, "")
+	s.hello(c, true, "", "")
 
 	pcm := make([]byte, framesPerChunk*channels*2)
 	var seq int64

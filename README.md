@@ -169,6 +169,12 @@ web/host.js      host page and mixer
 tools/offset.py  measure the real gap from a room recording
 ```
 
+The server pings every speaker every five seconds and drops any that stops
+answering within twelve. Without that a phone which sleeps, loses wifi or is
+swiped away never closes its socket, and the mixer slowly fills with speakers
+that already left. Each device also carries its own id, so coming back
+reclaims its row and its volume rather than adding a second one.
+
 Tests cover the parts where a mistake is invisible at runtime: the QR pointing
 at an unreachable address, a speaker joining mid stream not being told what is
 playing, and chunk timestamps drifting or overlapping.
