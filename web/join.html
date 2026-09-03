@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>taal speaker</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap">
+  <h1>taal</h1>
+  <p class="sub" id="source">waiting for the host</p>
+
+  <div id="setup">
+    <label class="field">
+      <span>name this speaker</span>
+      <input type="text" id="name" placeholder="kitchen phone" maxlength="24" autocomplete="off">
+    </label>
+    <button id="join" class="big">join the room</button>
+  </div>
+
+  <div id="panel" hidden>
+    <div class="state" id="state">connected</div>
+
+    <label class="nudge">
+      <span>nudge <b id="nudgeVal">0 ms</b></span>
+      <input type="range" id="nudge" min="-150" max="150" value="0" step="5">
+      <small>slide until the echo disappears</small>
+    </label>
+
+    <label class="nudge">
+      <span>volume <b id="volVal">100%</b></span>
+      <input type="range" id="vol" min="0" max="100" value="100" step="1">
+      <small>the host can also set this from the mixer</small>
+    </label>
+
+    <dl class="stats">
+      <div><dt>clock</dt><dd id="offset">-</dd></div>
+      <div><dt>rtt</dt><dd id="rtt">-</dd></div>
+      <div><dt>lead</dt><dd id="lead">-</dd></div>
+      <div><dt>dropped</dt><dd id="late">0</dd></div>
+    </dl>
+  </div>
+
+  <p class="tip">keep this screen on. bluetooth speakers will not stay in sync.</p>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
